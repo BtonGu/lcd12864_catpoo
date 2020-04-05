@@ -1,0 +1,208 @@
+C51 COMPILER V9.01   BB                                                                    12/30/2019 12:59:01 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE BB
+OBJECT MODULE PLACED IN bb.OBJ
+COMPILER INVOKED BY: d:\Keil_v4\C51\BIN\C51.EXE bb.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include <reg51.h>
+   2          
+   3          #define LCDLCDDisp_Off   0x3e
+   4          #define LCDLCDDisp_On    0x3f
+   5          #define Page_Add     0xb8//页地址
+   6          #define LCDCol_Add     0x40//列地址
+   7          #define Start_Line     0xC0//行地址
+   8          /*****液晶显示器的端口定义*****/
+   9          #define data_ora P0 /*液晶数据总线*/
+  10          sbit LCDMcs=P2^4 ;    /*片选1*/
+  11          sbit LCDScs=P2^3 ;    /*片选2*/
+  12          sbit RESET=P2^3 ;  /*复位信号*/
+  13          sbit LCDDi=P2^2 ;     /*数据/指令 选择*/
+  14          sbit LCDRW=P2^1 ;     /*读/写 选择*/
+  15          sbit LCDEnable=P2^0 ;     /*读/写 使能*/
+  16          
+  17          
+  18          
+  19          char code Hz_Deng[]= 
+  20          {
+  21          0xE0,0xF0,0xDF,0x7E,0x88,0x08,0x78,0xD8,0xFE,0xFF,0xE0,0x00,0x00,0x00,0x40,0x80,
+  22          0x03,0x04,0xC8,0x39,0x09,0x09,0x08,0x08,0xF8,0xF5,0xF3,0xF0,0xE0,0xE0,0xF0,0xCF
+  23          };
+  24          
+  25          char code Bmp_Miao[]= 
+  26          {
+  27          /*------------------------------------------------------------------------------
+  28            源文件 / 文字 : F:\LD测试仪\液晶\字模提取+排版软件\液晶字模提取\图例\ping.bmp萍
+  29            宽×高（像素）: 16×16
+  30            字模格式/大小 : 单色点阵液晶字模，纵向取模，字节倒序/32字节
+  31            数据转换日期  : 2010-7-29 8:46:30
+  32          ------------------------------------------------------------------------------*/
+  33          0x00,0x00,0x88,0x10,0x00,0xF0,0x90,0x90,0x90,0xFC,0x90,0x90,0x30,0x00,0x00,0x00,
+  34          0x00,0x00,0x10,0x09,0x20,0x1F,0x20,0x23,0x14,0x08,0x14,0x23,0x20,0x00,0x00,0x00
+  35          };
+  36          
+  37          char code Bmp_bo[]= 
+  38          {
+  39          0x00,0x80,0x00,0x20,0xE0,0x00,0x08,0x30,0xC0,0x00,0x02,0x0C,0x70,0x80,0x00,0x00,
+  40          0x00,0x00,0x00,0x02,0x03,0x00,0x10,0x0C,0x03,0x00,0x40,0x30,0x0E,0x01,0x00,0x00
+  41          };
+  42          
+  43          /****************************************************************************
+  44          函数功能:LCD延时程序
+  45          入口参数:t
+  46          出口参数:
+  47          ****************************************************************************/
+  48          void LCDdelay(unsigned int t)
+  49          {
+  50   1              unsigned int i,j;
+  51   1              for(i=0;i<t;i++);
+  52   1              for(j=0;j<10;j++);
+  53   1      }
+  54          /****************************************************************************
+  55          状态检查，LCD是否忙
+C51 COMPILER V9.01   BB                                                                    12/30/2019 12:59:01 PAGE 2   
+
+  56          
+  57          
+  58          *****************************************************************************/
+  59          void CheckState()               
+  60          {
+  61   1         unsigned char dat,DATA;//状态信息（判断是否忙）
+  62   1         LCDDi=0; // 数据\指令选择，D/I（RS）="L" ，表示 DB7∽DB0 为显示指令数据 
+  63   1         LCDRW=1; //R/W="H" ，E="H"数据被读到DB7∽DB0 
+  64   1         do
+  65   1         {
+  66   2            DATA=0x00;
+  67   2            LCDEnable=1;      //EN下降源
+  68   2                LCDdelay(2);//延时
+  69   2                dat=DATA;
+  70   2            LCDEnable=0;
+  71   2            dat=0x80 & dat; //仅当第7位为0时才可操作(判别busy信号)
+  72   2          }
+  73   1          while(!(dat==0x00));
+  74   1      }
+  75          /*****************************************************************************
+  76          函数功能:写命令到LCD程序，RS(DI)=L,RW=L,EN=H，即来一个脉冲写一次
+  77          入口参数:cmdcode
+  78          出口参数:
+  79          *****************************************************************************/
+  80          void write_com(unsigned char cmdcode)
+  81          {
+  82   1          CheckState();//检测LCD是否忙
+  83   1              LCDDi=0;
+  84   1              LCDRW=0;
+  85   1              P1=cmdcode;             
+  86   1              LCDdelay(2);
+  87   1              LCDEnable=1;
+  88   1              LCDdelay(2);
+  89   1              LCDEnable=0;
+  90   1      }
+  91          /*****************************************************************************
+  92          函数功能:LCD初始化程序
+  93          入口参数:
+  94          出口参数:
+  95          *****************************************************************************/
+  96          void init_lcd()
+  97          {
+  98   1              LCDdelay(100);  
+  99   1              LCDMcs=1;//刚开始关闭两屏
+ 100   1              LCDScs=1;
+ 101   1              LCDdelay(100);
+ 102   1              write_com(LCDLCDDisp_Off);       //写初始化命令
+ 103   1              write_com(Page_Add+0);
+ 104   1              write_com(Start_Line+0);
+ 105   1              write_com(LCDCol_Add+0);
+ 106   1              write_com(LCDLCDDisp_On);
+ 107   1      }
+ 108          /*****************************************************************************
+ 109          函数功能:写数据到LCD程序，RS(DI)=H,RW=L,EN=H，即来一个脉冲写一次
+ 110          入口参数:LCDDispdata
+ 111          出口参数:
+ 112          *****************************************************************************/
+ 113          void write_data(unsigned char LCDDispdata)
+ 114          {
+ 115   1          CheckState();//检测LCD是否忙
+ 116   1              LCDDi=1;
+ 117   1              LCDRW=0;
+C51 COMPILER V9.01   BB                                                                    12/30/2019 12:59:01 PAGE 3   
+
+ 118   1              P1=LCDDispdata;
+ 119   1              LCDdelay(2);
+ 120   1              LCDEnable=1;
+ 121   1              LCDdelay(2);
+ 122   1              LCDEnable=0;
+ 123   1      }
+ 124          /*****************************************************************************
+ 125          函数功能:清除LCD内存程序
+ 126          入口参数:pag,col,hzk
+ 127          出口参数:
+ 128          *****************************************************************************/
+ 129          void Clr_Scr()
+ 130          {
+ 131   1              unsigned char j,k;
+ 132   1              LCDMcs=0; //左、右屏均开显示
+ 133   1              LCDScs=0;
+ 134   1              write_com(Page_Add+0);
+ 135   1              write_com(LCDCol_Add+0);
+ 136   1              for(k=0;k<8;k++)//控制页数0-7，共8页
+ 137   1              {
+ 138   2                      write_com(Page_Add+k); //每页每页进行写
+ 139   2                      for(j=0;j<64;j++)  //每页最多可写32个中文文字或64个ASCII字符
+ 140   2                      {
+ 141   3                      write_com(LCDCol_Add+j);
+ 142   3                              write_data(0x00);//控制列数0-63，共64列，写点内容，列地址自动加1
+ 143   3                      }
+ 144   2              }
+ 145   1      }
+ 146          /*****************************************************************************
+ 147          函数功能:指定位置显示汉字16*16程序
+ 148          入口参数:page,column,hzk
+ 149          出口参数:
+ 150          *****************************************************************************/
+ 151          void hz_LCDDisp16(unsigned char page,unsigned char column, unsigned char code *hzk)
+ 152          {
+ 153   1              unsigned char j=0,i=0;
+ 154   1              for(j=0;j<2;j++)
+ 155   1              {
+ 156   2                      write_com(Page_Add+page+j);
+ 157   2                      write_com(LCDCol_Add+column);
+ 158   2                      for(i=0;i<16;i++) 
+ 159   2                              write_data(hzk[16*j+i]);
+ 160   2              }
+ 161   1      }
+ 162          
+ 163          void main()
+ 164          {
+ 165   1              init_lcd();
+ 166   1              Clr_Scr();
+ 167   1              LCDMcs=0; //左屏开显示
+ 168   1              LCDScs=1;
+ 169   1              hz_LCDDisp16(0,48,Hz_Deng);// Hz_Wo为某个汉字的首地址
+ 170   1              LCDMcs=1; //右屏开显示
+ 171   1              LCDScs=0;
+ 172   1              hz_LCDDisp16(0,0,Bmp_Miao);
+ 173   1                      hz_LCDDisp16(0,16,Bmp_bo);
+ 174   1              while(1)
+ 175   1          {
+ 176   2        
+ 177   2              }
+ 178   1      }
+ 179          
+C51 COMPILER V9.01   BB                                                                    12/30/2019 12:59:01 PAGE 4   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    321    ----
+   CONSTANT SIZE    =     96    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       6
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
